@@ -16,6 +16,13 @@ struct Sphere {
     vec3 color;
     int shader;
 };
+struct Heightmap {
+    vec3 position;
+    vec3 size;
+    //    sampler2D texture;
+    vec3 color;
+    int shader;
+};
 struct Ray {
     vec3 origin;
     vec3 direction;
@@ -27,11 +34,13 @@ struct Intersection {
 };
 layout(location = 0) uniform vec2 windowSize = vec2(640, 480);
 
-layout(location = 1) uniform int numLights = 1;
-layout(location = 2) uniform int numSpheres = 2;
+layout(location = 16) uniform int numLights = 1;
+layout(location = 17) uniform int numSpheres = 2;
+layout(location = 18) uniform int numHeightmaps = 1;
 
 /*layout(location = 64) uniform*/ Light lights[8];
 /*layout(location = 128) uniform*/ Sphere spheres[8];
+/*layout(location = 192) uniform*/ Heightmap heightmaps[8];
 
 Intersection sphereIntersect(Ray ray) {
     Intersection ret;
@@ -65,17 +74,83 @@ Intersection sphereIntersect(Ray ray) {
     }
     return ret;
 }
+Intersection heightmapIntersect(Ray ray) {
+    Intersection ret;
+    ret.object = -1;
 
-vec3 castRay(Ray ray, int iterations) {
-    if(iterations == 0) return vec3(0);
+    for(int i = 0; i < numHeightmaps; i++) {
+        vec3 bmin = heightmaps[i].position;
+        vec3 bmax = heightmaps[i].position + heightmaps[i].size;
 
+        if(ray.origin.y < bmin.y) {
+            continue;
+        } else if(ray.origin.y > bmax.y && ray.direction.y >= 0) {
+            continue;
+        } else if(ray.origin.x >= bmin.x && ray.origin.x <= bmax.x &&
+                  ray.origin.z >= bmin.z && ray.origin.z <= bmax.z) {
+            ret.object = i;
+            ret.normal = -ray.direction;
+            ret.distance = 0;
+            return ret;
+        }
+
+        float tmin = -1e10, tmax = 1e10;
+
+        vec3 normal;
+        if(ray.direction.x != 0) {
+            float tx1 = (bmin.x - ray.origin.x) / ray.direction.x;
+            float tx2 = (bmax.x - ray.origin.x) / ray.direction.x;
+            tmin = min(tx1, tx2);
+            tmax = max(tx1, tx2);
+            normal = vec3(-sign(ray.direction.x), 0, 0);
+        }
+        if(ray.direction.y != 0) {
+            float ty1 = (bmin.y - ray.origin.y) / ray.direction.y;
+            float ty2 = (bmax.y - ray.origin.y) / ray.direction.y;
+            tmax = min(tmax, max(ty1, ty2));
+            if(min(ty1, ty2) > tmin) {
+                tmin = min(ty1, ty2);
+                normal = vec3(0, -sign(ray.direction.y), 0);
+            }
+        }
+        if(ray.direction.z != 0) {
+            float tz1 = (bmin.z - ray.origin.z) / ray.direction.z;
+            float tz2 = (bmax.z - ray.origin.z) / ray.direction.z;
+            tmax = min(tmax, max(tz1, tz2));
+            if(min(tz1, tz2) > tmin) {
+                tmin = min(tz1, tz2);
+                normal = vec3(0, 0, -sign(ray.direction.z));
+            }
+        }
+
+        if(tmin > 0 && tmax > tmin &&
+           (tmin < ret.distance || ret.object == -1)) {
+            ret.distance = tmin;
+            ret.normal = normal;
+            ret.object = i;
+        }
+    }
+    return ret;
+}
+vec3 castRay(Ray ray) {
     Intersection s = sphereIntersect(ray);
-    if(s.object == -1) return vec3(0);
+    Intersection h = heightmapIntersect(ray);
+    if(s.object == -1 && h.object == -1) return vec3(0);
 
-    int shader = spheres[s.object].shader;
-    vec3 color = spheres[s.object].color;
-    vec3 point = ray.origin + ray.direction * s.distance;
-    vec3 normal = s.normal;
+    int shader;
+    vec3 color, point, normal;
+
+    if(s.object != -1 && (h.object == -1 || s.distance < h.distance)) {
+        shader = spheres[s.object].shader;
+        color = spheres[s.object].color;
+        point = ray.origin + ray.direction * s.distance;
+        normal = s.normal;
+    } else {
+        shader = heightmaps[h.object].shader;
+        color = heightmaps[h.object].color;
+        point = ray.origin + ray.direction * h.distance;
+        normal = h.normal;
+    }
 
     if(shader == DIFFUSE_SHADER) {
         vec3 diffuseColor = vec3(0);
@@ -83,8 +158,8 @@ vec3 castRay(Ray ray, int iterations) {
             vec3 lightDirection = normalize(lights[i].position - point);
             Ray shadowRay = Ray(point + 0.01 * lightDirection, lightDirection);
 
-            Intersection shadow = sphereIntersect(shadowRay);
-            if(shadow.object == -1) {
+            if(sphereIntersect(shadowRay).object == -1 &&
+               heightmapIntersect(shadowRay).object == -1) {
                 diffuseColor += color * dot(normal, lightDirection);
             }
         }
@@ -93,15 +168,20 @@ vec3 castRay(Ray ray, int iterations) {
 }
 
 void main() {
-    spheres[0].position = vec3(0.5, 0.5, 1);
+    spheres[0].position = vec3(0.5, 0.5, 2);
     spheres[0].color = vec3(1, 0, 0);
     spheres[0].radius = 0.4;
     spheres[0].shader = DIFFUSE_SHADER;
 
-    spheres[1].position = vec3(-1, -1, 2.5);
+    spheres[1].position = vec3(-1, -1, 4);
     spheres[1].color = vec3(0, 1, 0);
     spheres[1].radius = 1.0;
     spheres[0].shader = DIFFUSE_SHADER;
+
+    heightmaps[0].position = vec3(-4, -4, 5);
+    heightmaps[0].size = vec3(8, 0.5, 8);
+    heightmaps[0].color = vec3(0, 0, 1);
+    heightmaps[0].shader = DIFFUSE_SHADER;
 
     lights[0].position = vec3(1, 1, 0);
     lights[0].color = vec3(1);
@@ -110,9 +190,9 @@ void main() {
         vec2((gl_FragCoord.x - windowSize.x / 2) / (windowSize.y / 2),
              (gl_FragCoord.y - windowSize.y / 2) / (windowSize.y / 2));
 
-    vec3 eye = vec3(0, 0, -3);
-    vec3 target = vec3(position, 0);
+    vec3 eye = vec3(0, 2, -2);
+    vec3 target = vec3(position.x, position.y + 1, 0);
     Ray ray = Ray(eye, normalize(target - eye));
 
-    OutputColor = vec4(castRay(ray, 1), 1);
+    OutputColor = vec4(castRay(ray), 1);
 }
