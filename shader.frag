@@ -148,27 +148,6 @@ vec3 shade(int shader, vec3 color, vec3 point, vec3 normal,
 	}
 }
 
-// vec3 castRay(Ray ray) {
-//     Intersection s = sphereIntersect(ray);
-//     Intersection h = heightmapIntersect(ray);
-//     if(s.object == -1 && h.object == -1) return vec3(0);
-//     int shader;
-//     vec3 color, point, normal;
-//     if(s.object != -1 && (h.object == -1 || s.distance < h.distance)) {
-//         shader = spheres[s.object].shader;
-//         color = spheres[s.object].color;
-//         point = ray.origin + ray.direction * s.distance;
-//         normal = s.normal;
-//     } else {
-//         shader = heightmaps[h.object].shader;
-//         color = heightmaps[h.object].color;
-//         point = ray.origin + ray.direction * h.distance;
-//         normal = h.normal;
-//     }
-// 	float a, b;
-//     return shade(shader, color, point, normal, a, b);
-// }
-
 void main() {
 	// Left
     spheres[0] = Sphere(1e5, vec3(-1e5 - 50, 0,0), vec3(0),
@@ -202,18 +181,8 @@ void main() {
     spheres[7] = Sphere(16.5, vec3(33, 16.5, -38), vec3(0), vec3(1, 1, 1) * .999,
                         MIRROR_SHADER);
 
-    // spheres[0].position = vec3(0.5, 0.5, 2);
-    // spheres[0].color = vec3(1, 0, 0);
-    // spheres[0].radius = 0.4;
-    // spheres[0].shader = DIFFUSE_SHADER;
-
-    // spheres[1].position = vec3(-1, -1, 4);
-    // spheres[1].color = vec3(0, 1, 0);
-    // spheres[1].radius = 1.0;
-    // spheres[1].shader = MIRROR_SHADER;
-
 	lights[0].radius = 5;
-    lights[0].position = vec3(0, 48, -30);
+    lights[0].position = vec3(0, 44.9, -30);
     lights[0].color = vec3(10);
 
     vec2 position = vec2((gl_FragCoord.x - windowSize.x / 2 + random() - 0.5) /
