@@ -27,6 +27,8 @@ void printShaderLog(string prefix, GLuint shader) {
     cout << prefix << log.get() << endl;
 }
 void loadShaders() {
+	GLint success = 0;
+	
     GLuint v = glCreateShader(GL_VERTEX_SHADER);
     string vs = readTextFile("shader.vert");
     const char* vv = vs.c_str();
@@ -34,12 +36,18 @@ void loadShaders() {
     glCompileShader(v);
     printShaderLog("vertex shader: ", v);
 
+	glGetShaderiv(v, GL_COMPILE_STATUS, &success);
+	if(success == GL_FALSE) exit(-1);
+	
     GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
     string fs = readTextFile("shader.frag");
     const char* ff = fs.c_str();
     glShaderSource(f, 1, &ff, nullptr);
     glCompileShader(f);
     printShaderLog("fragment shader: ", f);
+
+	glGetShaderiv(f, GL_COMPILE_STATUS, &success);
+	if(success == GL_FALSE) exit(-1);
 
     GLuint program = glCreateProgram();
     glAttachShader(program, v);
@@ -100,19 +108,21 @@ int main(void) {
 
     glClearColor(0.0, 0.0, 0.0, 1.0);
 
-    int frameCount = 0;
-    auto frameCountStart = chrono::system_clock::now();
+    int lastPrint = 0;
+	unsigned int frameNumber = 0;
+    auto frameTimerStart = chrono::system_clock::now();
     while(!glfwWindowShouldClose(window)) {
-        if(reportFrameRate && frameCount++ > 100) {
+        if(reportFrameRate && frameNumber - lastPrint >= 100) {
             chrono::duration<double> length =
-                chrono::system_clock::now() - frameCountStart;
-            cout << floor((float)frameCount / length.count()) << endl;
+                chrono::system_clock::now() - frameTimerStart;
+            cout << floor((float)(frameNumber - lastPrint) / length.count())
+                 << endl;
 
-            frameCount = 1;
-            frameCountStart = chrono::system_clock::now();
+            lastPrint = frameNumber;
+            frameTimerStart = chrono::system_clock::now();
         }
 
-		glUniform4f(2, dis(gen), dis(gen), dis(gen), dis(gen));
+		glUniform1ui(2, frameNumber++);
 		
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
