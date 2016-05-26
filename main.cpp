@@ -1,4 +1,5 @@
 
+#include <random>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -19,7 +20,7 @@ string readTextFile(const char* filename) {
 void printShaderLog(string prefix, GLuint shader) {
     int logLength = 0;
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
-    if(logLength == 0) return;
+    if(logLength <= 1) return;
 
     unique_ptr<GLchar[]> log(new GLchar[logLength]);
     glGetShaderInfoLog(shader, logLength, nullptr, log.get());
@@ -38,7 +39,7 @@ void loadShaders() {
     const char* ff = fs.c_str();
     glShaderSource(f, 1, &ff, nullptr);
     glCompileShader(f);
-    printShaderLog("fragment shader", f);
+    printShaderLog("fragment shader: ", f);
 
     GLuint program = glCreateProgram();
     glAttachShader(program, v);
@@ -49,7 +50,11 @@ void loadShaders() {
 }
 
 int main(void) {
-    bool reportFrameRate = false;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(1, 2);
+	
+    bool reportFrameRate = true;
     GLFWwindow* window;
 
     /* Initialize the library */
@@ -59,6 +64,7 @@ int main(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     window = glfwCreateWindow(640, 480, "Acceleray", NULL, NULL);
     if(!window) {
         glfwTerminate();
@@ -67,16 +73,30 @@ int main(void) {
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
-    // glfwSwapInterval(0);
+	glfwSwapInterval(0);
 
     glewExperimental = GL_TRUE;
     glewInit();
-
+	
     loadShaders();
-
+	
     GLuint vao;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
+
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+	glUniform2f(0, width, height);
+	glViewport(0, 0, width, height);
+	
+	GLuint image;
+	glGenTextures(1, &image);
+	glBindTexture(GL_TEXTURE_2D, image);
+	unique_ptr<float> imageData(new float[width*height*4]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA,
+                 GL_FLOAT, imageData.get());
+	glBindTexture(GL_TEXTURE_2D, 0);
+    glBindImageTexture(0, image, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
     glClearColor(0.0, 0.0, 0.0, 1.0);
 
@@ -92,15 +112,13 @@ int main(void) {
             frameCountStart = chrono::system_clock::now();
         }
 
-        int width, height;
-        glfwGetWindowSize(window, &width, &height);
-        glUniform2f(0, width, height);
-
-        glViewport(0, 0, width, height);
+		glUniform4f(2, dis(gen), dis(gen), dis(gen), dis(gen));
+		
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
         glfwSwapBuffers(window);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glfwPollEvents();
     }
 
