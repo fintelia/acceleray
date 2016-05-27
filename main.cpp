@@ -115,8 +115,8 @@ int main(void) {
         if(reportFrameRate && frameNumber - lastPrint >= 100) {
             chrono::duration<double> length =
                 chrono::system_clock::now() - frameTimerStart;
-            cout << floor((float)(frameNumber - lastPrint) / length.count())
-                 << endl;
+            cout << "FPS = "<<floor((float)(frameNumber - lastPrint) / length.count())
+                 << ", Total Samples = " << frameNumber << endl;
 
             lastPrint = frameNumber;
             frameTimerStart = chrono::system_clock::now();
